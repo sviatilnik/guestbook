@@ -105,22 +105,26 @@ pipeline {
     }
     
     post {
-        success {
+    success {
+        script {
             archiveArtifacts(
                 artifacts: "build/${env.ARCHIVE_NAME}",
                 fingerprint: true,
                 onlyIfSuccessful: true
             )
             
+            // Получаем размер архива через sh
+            def archiveSize = sh(
+                script: "du -h build/${env.ARCHIVE_NAME} | cut -f1",
+                returnStdout: true
+            ).trim()
+            
             echo """
                 ✅ Archive ready: ${env.ARCHIVE_NAME}
-                📦 Size: $(du -h build/${env.ARCHIVE_NAME} | cut -f1)
+                📦 Size: ${archiveSize}
                 📥 Download from Jenkins artifacts
             """
         }
-        
-        failure {
-            echo '❌ Build failed, no archive created'
-        }
     }
+}
 }
