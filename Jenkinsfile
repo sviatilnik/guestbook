@@ -31,7 +31,10 @@ pipeline {
         }
         stage('Tests') {
             steps {
-                sh 'vendor/bin/phpunit --coverage-text'
+                sh '''
+            export XDEBUG_MODE=coverage
+            vendor/bin/phpunit --configuration phpunit.dist.xml
+        '''
             }
         }
         // stage('Deploy') { ... } // Добавите позже
