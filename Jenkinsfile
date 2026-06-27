@@ -1,53 +1,126 @@
 pipeline {
     agent any
-    options {
-        buildDiscarder(logRotator(numToKeepStr: '5'))
-    }
+    
     environment {
-        COMPOSER_HOME = "${WORKSPACE}/.cache/composer"
+        APP_ENV = 'prod'
+        XDEBUG_MODE = 'off'
     }
+    
     stages {
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
+        
         stage('Install Dependencies') {
             steps {
-                sh 'composer install --no-interaction --prefer-dist --optimize-autoloader'
+                sh '''
+                    # Production-установка без dev-зависимостей
+                    composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --classmap-authoritative
+                '''
             }
         }
-        stage('Code Style') {
-            steps {
-                // Пример для PHP-CS-Fixer
-                sh 'vendor/bin/php-cs-fixer fix --dry-run --diff'
-            }
-        }
-        stage('Static Analysis') {
-            steps {
-                // Если используете PHPStan/Psalm
-                sh 'vendor/bin/phpstan analyse src tests --level=5'
-            }
-        }
-        stage('Tests') {
+        
+        stage('Build Frontend') {
             steps {
                 sh '''
-            export XDEBUG_MODE=coverage
-            vendor/bin/phpunit --configuration phpunit.dist.xml
-        '''
+                    # Если есть Webpack Encore или AssetMapper
+                    if [ -f package.json ]; then
+                        npm ci --production
+                        npm run build
+                    fi
+                '''
             }
         }
-        // stage('Deploy') { ... } // Добавите позже
-    }
-    post {
-        always {
-            // Сохраняем артефакты (логи, отчёты) даже при падении
-            archiveArtifacts artifacts: 'build/*.log, storage/logs/*.log', allowEmptyArchive: true
-            junit 'build/reports/phpunit/*.xml' // Парсим результаты тестов для Jenkins
+        
+        stage('Warmup Cache') {
+            steps {
+                sh '''
+                    php bin/console cache:clear --env=prod --no-debug
+                    php bin/console cache:warmup --env=prod
+                '''
+            }
         }
-        //failure {
-            // Отправляем уведомление в Slack/Telegram/почту
-            // slackSend color: 'danger', message: "Сборка ${env.JOB_NAME} #${env.BUILD_NUMBER} упала"
-        //}
+        
+        stage('Create Archive') {
+            steps {
+                script {
+                    // Генерируем имя архива с версией и датой
+                    def version = sh(script: "git describe --tags --always --dirty 2>/dev/null || echo 'dev'", returnStdout: true).trim()
+                    def timestamp = new Date().format('yyyyMMdd-HHmmss')
+                    env.ARCHIVE_NAME = "app-${version}-${timestamp}.tar.gz"
+                    env.ARCHIVE_PATH = "build/${env.ARCHIVE_NAME}"
+                    
+                    sh '''
+                        mkdir -p build
+                        
+                        tar czf ${ARCHIVE_PATH} \
+                            --exclude='.git' \
+                            --exclude='.gitignore' \
+                            --exclude='.env' \
+                            --exclude='.env.*' \
+                            --exclude='node_modules' \
+                            --exclude='tests' \
+                            --exclude='var/cache' \
+                            --exclude='var/log' \
+                            --exclude='var/sessions' \
+                            --exclude='vendor/bin' \
+                            --exclude='build' \
+                            --exclude='docker' \
+                            --exclude='docker-compose.*' \
+                            --exclude='Dockerfile' \
+                            --exclude='Jenkinsfile' \
+                            --exclude='phpunit.xml.dist' \
+                            --exclude='.php-cs-fixer.dist.php' \
+                            --exclude='phpstan.neon' \
+                            --exclude='psalm.xml' \
+                            --exclude='README.md' \
+                            --exclude='.github' \
+                            --exclude='.gitlab-ci.yml' \
+                            .
+                        
+                        echo "Archive created: ${ARCHIVE_NAME}"
+                        ls -lh ${ARCHIVE_PATH}
+                    '''
+                }
+            }
+        }
+        
+        stage('Verify Archive') {
+            steps {
+                sh '''
+                    echo "=== Archive contents ==="
+                    tar tzf ${ARCHIVE_PATH} | head -30
+                    
+                    echo ""
+                    echo "=== Checking required files ==="
+                    tar tzf ${ARCHIVE_PATH} | grep -E "(composer.json|bin/console|public/index.php)" || {
+                        echo "ERROR: Required files missing!"
+                        exit 1
+                    }
+                '''
+            }
+        }
+    }
+    
+    post {
+        success {
+            archiveArtifacts(
+                artifacts: "build/${env.ARCHIVE_NAME}",
+                fingerprint: true,
+                onlyIfSuccessful: true
+            )
+            
+            echo """
+                ✅ Archive ready: ${env.ARCHIVE_NAME}
+                📦 Size: $(du -h build/${env.ARCHIVE_NAME} | cut -f1)
+                📥 Download from Jenkins artifacts
+            """
+        }
+        
+        failure {
+            echo '❌ Build failed, no archive created'
+        }
     }
 }
