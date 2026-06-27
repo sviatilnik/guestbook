@@ -42,9 +42,9 @@ pipeline {
             archiveArtifacts artifacts: 'build/*.log, storage/logs/*.log', allowEmptyArchive: true
             junit 'build/reports/phpunit/*.xml' // Парсим результаты тестов для Jenkins
         }
-        failure {
+        //failure {
             // Отправляем уведомление в Slack/Telegram/почту
             // slackSend color: 'danger', message: "Сборка ${env.JOB_NAME} #${env.BUILD_NUMBER} упала"
-        }
+        //}
     }
 }
