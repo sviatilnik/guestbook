@@ -80,7 +80,7 @@ pipeline {
         stage('Create Archive') {
             steps {
                 script {
-                    sh '''
+                    sh """
                         mkdir -p build
 
                         tar czf build/${env.ARCHIVE_NAME} \
@@ -108,8 +108,8 @@ pipeline {
                             --exclude='.gitlab-ci.yml' \
                             .
 
-                        echo "Archive created: build/${ARCHIVE_NAME}"
-                    '''
+                        echo "Archive created: build/${env.ARCHIVE_NAME}"
+                    """
                 }
             }
         }
@@ -118,11 +118,11 @@ pipeline {
             steps {
                 sh '''
                     echo "=== Archive contents ==="
-                    tar tzf build/${ARCHIVE_NAME} | head -30
+                    tar tzf build/${env.ARCHIVE_NAME} | head -30
 
                     echo ""
                     echo "=== Checking required files ==="
-                    tar tzf build/${ARCHIVE_NAME} | grep -E "(composer.json|bin/console|public/index.php)" || {
+                    tar tzf build/${env.ARCHIVE_NAME} | grep -E "(composer.json|bin/console|public/index.php)" || {
                         echo "ERROR: Required files missing!"
                         exit 1
                     }
