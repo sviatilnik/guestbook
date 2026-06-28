@@ -82,6 +82,7 @@ pipeline {
                 script {
                     sh """
                         mkdir -p build
+                        echo '${env.APP_VERSION}' > build/${env.ARCHIVE_NAME}/VERSION.txt
 
                         tar czf build/${env.ARCHIVE_NAME} \
                             --exclude='.git' \
@@ -129,10 +130,8 @@ pipeline {
     post {
     success {
         script {
-            sh "echo '${env.APP_VERSION}' > build/VERSION.txt"
-
                 archiveArtifacts(
-                    artifacts: "build/${env.ARCHIVE_NAME}, build/VERSION.txt",
+                    artifacts: "build/${env.ARCHIVE_NAME}",
                     fingerprint: true,
                     onlyIfSuccessful: true
                 )
