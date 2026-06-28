@@ -116,17 +116,12 @@ pipeline {
 
         stage('Verify Archive') {
             steps {
-                sh '''
-                    echo "=== Archive contents ==="
-                    tar tzf build/${env.ARCHIVE_NAME} | head -30
-
-                    echo ""
-                    echo "=== Checking required files ==="
-                    tar tzf build/${env.ARCHIVE_NAME} | grep -E "(composer.json|bin/console|public/index.php)" || {
-                        echo "ERROR: Required files missing!"
+                sh """
+                    tar tzf build/${env.ARCHIVE_NAME} | grep -E '(composer.json|bin/console|public/index.php)' || {
+                        echo 'ERROR: Required files missing!'
                         exit 1
                     }
-                '''
+                """
             }
         }
     }
