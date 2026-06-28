@@ -85,7 +85,7 @@ pipeline {
 
                         rm -f VERSION.txt
 
-                        echo '${env.APP_VERSION}' > build/VERSION.txt
+                        echo '${env.APP_VERSION}' > VERSION.txt
 
                         tar czf build/${env.ARCHIVE_NAME} \
                             --exclude='.git' \
