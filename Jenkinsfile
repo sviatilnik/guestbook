@@ -82,7 +82,10 @@ pipeline {
                 script {
                     sh """
                         mkdir -p build
-                        echo '${env.APP_VERSION}' > build/${env.ARCHIVE_NAME}/VERSION.txt
+
+                        rm -f VERSION.txt
+
+                        echo '${env.APP_VERSION}' > build/VERSION.txt
 
                         tar czf build/${env.ARCHIVE_NAME} \
                             --exclude='.git' \
